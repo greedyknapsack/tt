@@ -111,15 +111,15 @@ import java.io.*;
 import java.net.*;
 import java.util.Arrays;
 
-
 public class SelectiveRepeatSender {
-    private static final int PORT = 9871;
-    
+    private static final int FROM_PORT = 9870;
+    private static final int TO_PORT = 9871;    
+
     public static void main(String[] args) throws Exception {
         InetAddress ip=InetAddress.getLocalHost();
         byte[] receiveData=new byte[1024];
 
-        DatagramSocket ds=new DatagramSocket();
+        DatagramSocket ds=new DatagramSocket(FROM_PORT);
 
         int frames[]={1,2,3,4,5,6,7,8,9};
         boolean received[]=new boolean[frames.length];
@@ -127,70 +127,45 @@ public class SelectiveRepeatSender {
         int window=4;
         int frames_sent=0;
 
-
         String str=(frames.length+"");
-        ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,PORT));
+        ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,TO_PORT));
 
         str=(window+"");
-        ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,PORT));
-        
+        ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,TO_PORT));
         
         ds.setSoTimeout(5000);
 
         int l=0,r=window-1;
-        /*while(l<frames.length)
-        {
-            for(int i=l;i<=r;i++)
-            {
-                if(i>=frames.length)
-                    break;
-                str=(frames[i]+"");
-                ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,PORT));
-                System.out.println("Sent frame: "+frames[i]);
-            }
-            try
-            {
-                ds.receive(new DatagramPacket(receiveData, receiveData.length));
-                int ack=Integer.parseInt(new String(receiveData).trim());
-                System.out.println("Received ACK for frame: "+ack);
-                if(ack>=l && ack<=r)
-                {
-                    l=ack+1;
-                    r=Math.min(l+window-1,frames.length-1);
-                }
-            }
-            catch(SocketTimeoutException e)
-            {
-                System.out.println("Timeout, resending frames: "+l+" to "+r);
-            }
-        }*/
-
         while(frames_sent<frames.length)
         {
+            boolean flag=true;
             for(int i=l;i<=r;i++)
             {
                 if(received[i])
                     continue;
+                flag=false;
                 str=(frames[i]+"");
-                ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,PORT));
+                ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,TO_PORT));
                 System.out.println("Sent frame: "+frames[i]);
+            }
+            if(flag)
+            {
+                System.out.println("All frames in window"+l+","+r+" sent");
+                l=r+1;
+                r=Math.min(l+window-1,frames.length-1);
+                continue;
             }
             while(true){
                 try
                 {
                     ds.receive(new DatagramPacket(receiveData, receiveData.length));
                     int ack=Integer.parseInt(new String(receiveData).trim());
-                    System.out.println("Received ACK for frame: "+ack);
+                    //System.out.println("Received ACK for frame: "+ack);
                     if(!received[ack])
                     {
                         received[ack]=true;
                         System.out.println("Received ACK for frame: "+ack);
-                        if(ack==l)
-                        {
-                            l++;
-                            r++;
-                            frames_sent++;
-                        }
+                        frames_sent++;
                     }
                     
                 }
@@ -200,11 +175,9 @@ public class SelectiveRepeatSender {
                     break;
                 }
             }
-           
         }
         ds.close();
     }
 }
-
 
 

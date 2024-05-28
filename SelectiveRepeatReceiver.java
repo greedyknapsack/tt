@@ -66,14 +66,14 @@ import java.net.*;
 import java.util.Arrays;
 
 public class SelectiveRepeatReceiver {
-    private static final int PORT = 9870;
+    private static final int FROM_PORT = 9871;
+    private static final int TO_PORT = 9870;    
 
     public static void main(String[] args) throws Exception {
         
-        InetAddress ip=InetAddress.getLocalHost();
         byte[] receiveData=new byte[1024];
 
-        DatagramSocket ds=new DatagramSocket(PORT);
+        DatagramSocket ds=new DatagramSocket(FROM_PORT);
         
         ds.receive(new DatagramPacket(receiveData, receiveData.length));
         int frame_count=Integer.parseInt(new String(receiveData).trim());
@@ -90,12 +90,14 @@ public class SelectiveRepeatReceiver {
 
         int frames_received=0;
         int l=0,r=window-1;
-
+       
         while(frames_received<frame_count)
         {
             try{
-                ds.receive(new DatagramPacket(receiveData, receiveData.length));
+                DatagramPacket receivedPacket = new DatagramPacket(receiveData, receiveData.length);
+                ds.receive(receivedPacket);
                 int frame=Integer.parseInt(new String(receiveData).trim());
+                
                 if(frame < l || frame > r) {
                     continue; // Ignore frames outside the current window
                 }
@@ -104,7 +106,10 @@ public class SelectiveRepeatReceiver {
                     frames_received++;
                     System.out.println("Received frame: "+frame);
                     String str=(frame+"");
-                    ds.send(new DatagramPacket(str.getBytes(),str.length(),ip,PORT)); // Send ACK for received frame
+
+                    InetAddress senderIp = receivedPacket.getAddress();
+                    ds.send(new DatagramPacket(str.getBytes(),str.length(),senderIp,TO_PORT)); // Send ACK for received frame
+
                     System.out.println("Sent ACK for frame: "+frame);
                     while(l < frame_count && received[l]) { // Slide window if possible
                         l++;
